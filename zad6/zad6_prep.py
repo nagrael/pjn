@@ -12,7 +12,7 @@ from scipy import sparse
 from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
-from sklearn.svm import SVC
+from sklearn.svm import SVC, LinearSVC
 from tqdm import tqdm
 
 most_common_words = ['w', 'z', 'i', 'na', 'do', 'nie', 'k', 'o', 'że', 'art', 'r', 'się', 'przez', 'a', 'dnia', 'od',
@@ -34,7 +34,7 @@ group_match = [
     re.compile(r"\bW.*\b"),
     re.compile(r"\bAm.*\b")
 ]
-names = ["A?C.*"
+names = ["A?C.*",
          "A?U.*",
          "A?K.*",
          "G.*",
@@ -124,8 +124,6 @@ def give_me(tars):
                 if conditions(name[:-5], y['id'], y['courtType'], y['judgmentDate']):
                     for num, matching in enumerate(group_match):
                         if matching.search(y['courtCases'][0]['caseNumber']):
-                            # yield num, (name[:-5], y['id'])
-                            # print(num, y['courtCases'][0]['caseNumber'])
                             words = com.split(from_uzas.search(com2.sub("", com1.sub("", y['textContent']))).group(1))
 
                             if len(words) > 0:
@@ -214,10 +212,37 @@ def SVM_test(path):
         cla.fit(X_train, Y_train)
         print(classification_report(Y_test, cla.predict(X_test)))
 
+def lin_SVM_test(path):
+    with open(os.path.join(path, "train_perm"), "r") as f:
+        Y_train = literal_eval(f.read())
+    with open(os.path.join(path, "test_perm"), "r") as f:
+        Y_test = literal_eval(f.read())
+    X_test = TfidfTransformer(use_idf=True).fit_transform(sparse.load_npz(os.path.join(path, "sparse_test.npz")))
+    X_train = TfidfTransformer(use_idf=True).fit_transform(sparse.load_npz(os.path.join(path, "sparse_train.npz")))
+    print(X_test.shape)
+    print(X_train.shape)
+    for i, name in enumerate(names):
+        print(name)
+        cla = LinearSVC(C=100)
+        cla.fit(X_train, Y_train)
+        Y_pre = cla.predict(X_test)
+        print("accuracy_score")
+        print(accuracy_score(Y_test, Y_pre))
+        print("classification_report")
+        print(classification_report(Y_test, Y_pre))
+        print("micro_report")
+        print(precision_recall_fscore_support(Y_test, Y_pre, average='micro'))
+        print("macro_report")
+        print(precision_recall_fscore_support(Y_test, Y_pre, average='macro'))
 
-if __name__ == "__main":
-    to_count_files("../saos-dump-23.02.2018.tar.gz")
-    save_to_sparse_bag("norm")
-    save_to_sparse_bag("trans")
+
+if __name__ == "__main__":
+    # to_count_files("../saos-dump-23.02.2018.tar.gz")
+    # save_to_sparse_bag("norm")
+    # save_to_sparse_bag("trans")
     # SVM_test("norm")
     # SVM_test("trans")
+    with open("result_list", "rb") as f:
+        classes = pickle.load(f)
+    for i, cla in enumerate(classes):
+        print("Class {} has {} samples.".format(names[i], len(cla)))
